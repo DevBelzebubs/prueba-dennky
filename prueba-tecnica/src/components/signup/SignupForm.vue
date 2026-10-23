@@ -1,18 +1,48 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import SignupValidationModal from './SignupValidationModal.vue'
 
 const name = ref('')
 const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const confirmationInput = ref<HTMLInputElement | null>(null)
+const hasSubmitted = ref(false)
+const showEmptyFieldsModal = ref(false)
 
-watch([password, confirmPassword], ([currentPassword, currentConfirmation]) => {
-  confirmationInput.value?.setCustomValidity(
-    currentConfirmation && currentPassword !== currentConfirmation ? 'Passwords do not match.' : '',
-  )
+const touched = reactive({
+  name: false,
+  email: false,
+  password: false,
+  confirmPassword: false,
 })
+
+const errors = computed(() => ({
+  name: name.value.trim() ? '' : 'Name is required.',
+  email: !email.value.trim()
+    ? 'Email is required.'
+    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)
+    ? 'Enter a valid email address.'
+    : '',
+  password: !password.value
+    ? 'Password is required.'
+    : password.value.length < 8
+    ? 'Password must be at least 8 characters.'
+    : '',
+  confirmPassword: !confirmPassword.value
+    ? 'Please confirm your password.'
+    : confirmPassword.value !== password.value
+    ? 'Passwords do not match.'
+    : '',
+}))
+
+const shouldShowError = (field: keyof typeof touched) => (touched[field] || hasSubmitted.value) && !!errors.value[field]
+
+function submitForm() {
+  hasSubmitted.value = true
+  showEmptyFieldsModal.value = [name, email, password, confirmPassword].some((f) => !f.value.trim())
+}
 </script>
+
 <template>
   <div class="grid min-w-0 place-items-center bg-white px-6 py-8 min-[721px]:p-10">
     <div class="w-full max-w-[330px]">
@@ -22,38 +52,110 @@ watch([password, confirmPassword], ([currentPassword, currentConfirmation]) => {
         </h1>
         <p class="text-[11px] text-[#858585]">Join Nucleus UI and start designing with ease.</p>
       </header>
-      <form class="grid gap-[10px]" @submit.prevent>
-        <label
-          class="grid min-h-[42px] content-center rounded-lg border border-[#e8e8e8] bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]">
-          <span class="text-[9px] leading-tight text-[#999]">Name</span>
-          <input v-model="name"
-            class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
-            autocomplete="name" name="name" placeholder="Alex Jordan" required />
-        </label>
-        <label
-          class="grid min-h-[42px] content-center rounded-lg border border-[#e8e8e8] bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]">
-          <span class="text-[9px] leading-tight text-[#999]">Email</span>
-          <input v-model="email"
-            class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
-            autocomplete="email" name="email" placeholder="alex.jordan@gmail.com" required type="email" />
-        </label>
-        <label
-          class="grid min-h-[42px] content-center rounded-lg border border-[#e8e8e8] bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]">
-          <span class="text-[9px] leading-tight text-[#999]">Password</span>
-          <input v-model="password" class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]" autocomplete="new-password" minlength="8" name="password" placeholder="Enter your password" required type="password" />
-        </label>
-        <label
-          class="grid min-h-[42px] content-center rounded-lg border border-[#e8e8e8] bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]">
-          <span class="text-[9px] leading-tight text-[#999]">Confirm password</span>
-          <input ref="confirmationInput" v-model="confirmPassword"
-            class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
-            autocomplete="new-password" name="confirm-password" placeholder="Confirm password" required
-            type="password" />
-        </label>
+
+      <form class="grid gap-[10px]" novalidate @submit.prevent="submitForm">
+        <div>
+          <label class="grid min-h-[42px] content-center rounded-lg border bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]" :class="shouldShowError('name') ? 'border-red-500' : 'border-[#e8e8e8]'" for="signup-name">
+            <span class="text-[9px] leading-tight text-[#999]">Name</span>
+            <input
+              id="signup-name"
+              v-model="name"
+              class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
+              :aria-describedby="shouldShowError('name') ? 'signup-name-error' : undefined"
+              :aria-invalid="shouldShowError('name')"
+              autocomplete="name"
+              name="name"
+              placeholder="Alex Jordan"
+              @blur="touched.name = true"
+            />
+          </label>
+          <p v-if="shouldShowError('name')" id="signup-name-error" class="mt-1 text-xs text-red-600">
+            {{ errors.name }}
+          </p>
+        </div>
+
+        <div>
+          <label
+            class="grid min-h-[42px] content-center rounded-lg border bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]"
+            :class="shouldShowError('email') ? 'border-red-500' : 'border-[#e8e8e8]'"
+            for="signup-email">
+            <span class="text-[9px] leading-tight text-[#999]">Email</span>
+            <input
+              id="signup-email"
+              v-model="email"
+              class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
+              :aria-describedby="shouldShowError('email') ? 'signup-email-error' : undefined"
+              :aria-invalid="shouldShowError('email')"
+              autocomplete="email"
+              name="email"
+              placeholder="alex.jordan@gmail.com"
+              type="email"
+              @blur="touched.email = true"
+            />
+          </label>
+          <p v-if="shouldShowError('email')" id="signup-email-error" class="mt-1 text-xs text-red-600">
+            {{ errors.email }}
+          </p>
+        </div>
+
+        <div>
+          <label
+            class="grid min-h-[42px] content-center rounded-lg border bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]"
+            :class="shouldShowError('password') ? 'border-red-500' : 'border-[#e8e8e8]'"
+            for="signup-password"
+          >
+            <span class="text-[9px] leading-tight text-[#999]">Password</span>
+            <input
+              id="signup-password"
+              v-model="password"
+              class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
+              :aria-describedby="shouldShowError('password') ? 'signup-password-error' : undefined"
+              :aria-invalid="shouldShowError('password')"
+              autocomplete="new-password"
+              name="password"
+              placeholder="Enter your password"
+              type="password"
+              @blur="touched.password = true"
+            />
+          </label>
+          <p v-if="shouldShowError('password')" id="signup-password-error" class="mt-1 text-xs text-red-600">
+            {{ errors.password }}
+          </p>
+        </div>
+
+        <div>
+          <label
+            class="grid min-h-[42px] content-center rounded-lg border bg-white px-[11px] py-1 transition focus-within:border-[#7655ff] focus-within:shadow-[0_0_0_3px_rgba(118,85,255,0.2)]"
+            :class="shouldShowError('confirmPassword') ? 'border-red-500' : 'border-[#e8e8e8]'"
+            for="signup-confirm-password"
+          >
+            <span class="text-[9px] leading-tight text-[#999]">Confirm password</span>
+            <input
+              id="signup-confirm-password"
+              v-model="confirmPassword"
+              class="min-w-0 border-0 bg-transparent py-px text-xs text-[#222] outline-none placeholder:text-[#999]"
+              :aria-describedby="shouldShowError('confirmPassword') ? 'signup-confirm-password-error' : undefined"
+              :aria-invalid="shouldShowError('confirmPassword')"
+              autocomplete="new-password"
+              name="confirm-password"
+              placeholder="Confirm password"
+              type="password"
+              @blur="touched.confirmPassword = true"
+            />
+          </label>
+          <p
+            v-if="shouldShowError('confirmPassword')"
+            id="signup-confirm-password-error"
+            class="mt-1 text-xs text-red-600"
+          >
+            {{ errors.confirmPassword }}
+          </p>
+        </div>
 
         <button
-          class="mt-[5px] flex min-h-11 w-full items-center justify-center rounded-full bg-[#7354f8] text-[11px] font-semibold text-white transition hover:bg-[#6242e9] active:translate-y-px cursor-pointer"
-          type="submit">
+          class="mt-[5px] flex min-h-11 w-full cursor-pointer items-center justify-center rounded-full bg-[#7354f8] text-[11px] font-semibold text-white transition hover:bg-[#6242e9] active:translate-y-px"
+          type="submit"
+        >
           Create account
         </button>
       </form>
@@ -65,16 +167,14 @@ watch([password, confirmPassword], ([currentPassword, currentConfirmation]) => {
       </div>
 
       <button
-        class="relative flex min-h-11 w-full items-center justify-center rounded-full bg-[#f4f5f7] text-[11px] font-semibold text-[#222] transition hover:bg-[#eceef1] cursor-pointer"
-        type="button">
+        class="relative flex min-h-11 w-full cursor-pointer items-center justify-center rounded-full bg-[#f4f5f7] text-[11px] font-semibold text-[#222] transition hover:bg-[#eceef1]"
+        type="button"
+      >
         <svg class="absolute left-3 h-[19px] w-[19px]" viewBox="0 0 48 48" aria-hidden="true">
-          <path fill="#4285F4"
-            d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15Z" />
-          <path fill="#34A853"
-            d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z" />
+          <path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5.1h6.6c3.9-3.6 6.1-8.8 6.1-15Z" />
+          <path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.9l-6.6-5.1c-1.8 1.2-4 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.3A20 20 0 0 0 24 44Z" />
           <path fill="#FBBC05" d="M12.6 27.6a12 12 0 0 1 0-7.2v-5.3H5.8a20 20 0 0 0 0 17.8l6.8-5.3Z" />
-          <path fill="#EA4335"
-            d="M24 12c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 6 29.5 4 24 4A20 20 0 0 0 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12Z" />
+          <path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.8-5.8C34.1 6 29.5 4 24 4A20 20 0 0 0 5.8 15.1l6.8 5.3C14.2 15.6 18.7 12 24 12Z" />
         </svg>
         <span>Sign up with Google</span>
       </button>
@@ -85,4 +185,6 @@ watch([password, confirmPassword], ([currentPassword, currentConfirmation]) => {
       </p>
     </div>
   </div>
+
+  <SignupValidationModal v-model="showEmptyFieldsModal" />
 </template>
